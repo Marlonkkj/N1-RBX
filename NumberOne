@@ -1,16 +1,3 @@
---[[
-    ===================================================================
-    N1 RBX - Ultimate Stand / Follower Bot Controller (.luau)
-    Zero-Latency Localhost HTTP + Cloud Loader + JoJo Visuals Edition
-    ===================================================================
-    Inspirado no estilo Stand Bot de combate (Gakuran / Anime / Blade Ball)
-    Com proteção de interface (gethui/CoreGui) e utilitários universais
-    
-    Como rodar direto da Nuvem com 1 Linha (Anti-Cache 100% Atualizado):
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/SEU_USER/SEU_REPO/main/stand_bot.luau?t=" .. math.floor(os.clock() * 1000000)))()
-    ===================================================================
-]]--
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
@@ -23,12 +10,6 @@ local Debris = game:GetService("Debris")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- -------------------------------------------------------------
--- Utilitários de Compatibilidade e Proteção de Interface
--- (Inspirados nas melhores práticas do Y Hub Loader)
--- -------------------------------------------------------------
-
--- 1. Identificação do Executor
 local function GetExecutorName()
     local getter = identifyexecutor or getexecutorname
     if type(getter) == "function" then
@@ -41,7 +22,6 @@ local function GetExecutorName()
 end
 local executorName = GetExecutorName()
 
--- 2. Requester Universal de Alta Performance
 local function ResolveHttpRequest()
     local candidates = {
         (syn and syn.request),
@@ -59,8 +39,6 @@ local function ResolveHttpRequest()
 end
 local httpRequest = ResolveHttpRequest()
 
--- 3. Montador de UI Protegido (gethui -> CoreGui -> PlayerGui)
--- Impede detecção por scripts do jogo e evita remoção na morte do personagem
 local function MountGui(gui)
     local function TryMount(parent)
         if typeof(parent) ~= "Instance" then return false end
@@ -82,7 +60,6 @@ local function MountGui(gui)
     return TryMount(LocalPlayer:WaitForChild("PlayerGui", 5))
 end
 
--- 4. Função Segura de Animação Tween
 local function Animate(object, properties, duration, style, direction)
     local tween = TweenService:Create(
         object,
@@ -93,7 +70,6 @@ local function Animate(object, properties, duration, style, direction)
     return tween
 end
 
--- 5. Função Segura para Área de Transferência
 local function CopyToClipboard(text)
     local fn = setclipboard or toclipboard or (syn and syn.write_clipboard)
     if type(fn) == "function" then
@@ -103,15 +79,11 @@ local function CopyToClipboard(text)
     return false
 end
 
--- -------------------------------------------------------------
--- Configurações e Estados
--- -------------------------------------------------------------
 local LOCAL_API = "http://127.0.0.1:28888/config"
 local BRIDGE_FILE = "stand_bridge.json"
 local connection_mode = "Conectando..."
 
 local Config = {
-    -- Sistema Core
     enabled = true,
     death_transfer = true,
     auto_target = false,
@@ -120,33 +92,30 @@ local Config = {
     target_player = "",
     timestamp = 0,
 
-    -- Visual e Estética Stand (100% fiel ao estilo JoJo / Gakuran)
     stand_visuals = true,
-    stand_transparency = 0.35,     -- Efeito fantasma / etéreo
-    stand_noclip = true,           -- Atravessa paredes e jogadores sem colidir
-    stand_aura = true,             -- Efeito Highlight / Chams brilhante
-    aura_color = Color3.fromRGB(150, 45, 255),    -- Roxo místico (customizável via chat/menu)
+    stand_transparency = 0.35,
+    stand_noclip = true,
+    stand_aura = true,
+    aura_color = Color3.fromRGB(150, 45, 255),
     aura_outline = Color3.fromRGB(230, 180, 255),
-    stand_mode = "JoJo",           -- "JoJo" (Ombro flutuante), "Back", "Front" (Escudo), "Orbit", "Stay"
-    stand_offset_x = 2.4,          -- Distância lateral (ao lado do ombro)
-    stand_offset_y = 1.35,         -- Altura do chão (flutuando no ar)
-    stand_offset_z = 2.1,          -- Distância para trás
-    stand_bob_speed = 2.8,         -- Frequência da respiração/levitação flutuante
-    stand_bob_height = 0.38,       -- Amplitude do bobbing vertical
-    follow_smoothness = 16.0,      -- Suavidade de interpolação CFrame
-    rush_on_attack = true,         -- Voa até o inimigo no ataque e volta pro ombro
-    overhead_tag = true,           -- Tag suspensa estilizada sobre o Stand
+    stand_mode = "JoJo",
+    stand_offset_x = 2.4,
+    stand_offset_y = 1.35,
+    stand_offset_z = 2.1,
+    stand_bob_speed = 2.8,
+    stand_bob_height = 0.38,
+    follow_smoothness = 16.0,
+    rush_on_attack = true,
+    overhead_tag = true,
 
-    -- Mímica e Comandos
-    mimic_master = true,           -- Stand pula, ataca e defende quando o mestre faz
-    chat_commands = true,          -- Permite comandar o Stand pelo chat (.stay, .rush, etc.)
-    chat_prefix = ".",             -- Prefixo de comando (. ou ! ou ;)
+    mimic_master = true,
+    chat_commands = true,
+    chat_prefix = ".",
 
-    -- Combate Gakuran / Fighting / Blade Ball
     auto_parry = true,
     auto_attack = false,
-    attack_mode = "M1",            -- "M1", "Heavy", "Orbit", "Barrage"
-    auto_stance = true,            -- Ativa Stance de Luta (tecla T no Gakuran)
+    attack_mode = "M1",
+    auto_stance = true,
     m1_sfx = false,
     m1_sfx_gap = 0.95,
     follow_distance = 2.4,
@@ -160,7 +129,6 @@ local Config = {
     throw_orbit_speed = 30.0
 }
 
--- Estados Internos de Controle
 local last_attack_time = 0
 local last_sfx_time = 0
 local last_parry_time = 0
@@ -170,7 +138,6 @@ local active_target_character = nil
 local aura_instance = nil
 local overhead_instance = nil
 
--- Tabela de Cores para o comando .aura
 local COLOR_PRESETS = {
     purple = Color3.fromRGB(150, 45, 255),
     violet = Color3.fromRGB(180, 70, 255),
@@ -186,11 +153,7 @@ local COLOR_PRESETS = {
     pink = Color3.fromRGB(255, 105, 180)
 }
 
--- -------------------------------------------------------------
--- 1. Sincronização Localhost HTTP & File Bridge
--- -------------------------------------------------------------
 local function LoadBridge()
-    -- HTTP Localhost (< 1ms RAM do N1)
     if httpRequest then
         local success, res = pcall(function()
             return httpRequest({
@@ -212,7 +175,6 @@ local function LoadBridge()
         end
     end
 
-    -- Fallback via Arquivo Local (stand_bridge.json)
     local success, content = pcall(function()
         if typeof(readfile) == "function" and isfile(BRIDGE_FILE) then
             return readfile(BRIDGE_FILE)
@@ -237,9 +199,6 @@ local function LoadBridge()
     return false
 end
 
--- -------------------------------------------------------------
--- 2. Localização de Jogadores e Mestre Atual
--- -------------------------------------------------------------
 local function FindPlayer(nameQuery)
     if not nameQuery or nameQuery == "" or nameQuery == "none" then return nil end
     local lower = string.lower(nameQuery)
@@ -297,14 +256,10 @@ local function GetCurrentMaster()
     return nil, "Nenhum"
 end
 
--- -------------------------------------------------------------
--- 3. Aparência Visual: Stand Aura (Highlight), Fantasma & Tag
--- -------------------------------------------------------------
 local function ApplyStandVisuals()
     local char = LocalPlayer.Character
     if not char then return end
 
-    -- 1. Transparência Fantasma (Ghost Look)
     if Config.stand_visuals then
         for _, part in ipairs(char:GetDescendants()) do
             if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
@@ -316,7 +271,6 @@ local function ApplyStandVisuals()
         end
     end
 
-    -- 2. Aura Brilhante (Highlight Chams)
     if Config.stand_visuals and Config.stand_aura then
         if not aura_instance or aura_instance.Parent ~= char then
             if char:FindFirstChild("StandHighlight") then
@@ -340,7 +294,6 @@ local function ApplyStandVisuals()
         aura_instance = nil
     end
 
-    -- 3. Overhead Tag Visual JoJo ([ STAND ] Mestre: X)
     local root = char:FindFirstChild("HumanoidRootPart")
     if root and Config.overhead_tag then
         if not overhead_instance or overhead_instance.Parent ~= root then
@@ -401,9 +354,6 @@ local function ApplyStandVisuals()
     end
 end
 
--- -------------------------------------------------------------
--- 4. NoClip & Interrupção de Animações Terrestres (Levitação)
--- -------------------------------------------------------------
 RunService.Stepped:Connect(function()
     if not Config.stand_noclip then return end
     local char = LocalPlayer.Character
@@ -430,9 +380,6 @@ local function SuppressWalkingAnimations()
     end
 end
 
--- -------------------------------------------------------------
--- 5. Mecânicas de Combate: Gakuran & Blade Ball
--- -------------------------------------------------------------
 local function EnsureCombatStance()
     local now = tick()
     if now - last_stance_check < 3.0 then return end
@@ -450,14 +397,12 @@ local function TriggerParry()
     if now - last_parry_time < 0.12 then return end
     last_parry_time = now
 
-    -- 1. Input Direto no Jogo (Gakuran F tap / Deflect)
     pcall(function()
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
         task.wait(0.02)
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
     end)
 
-    -- 2. Remotes para Blade Ball e Combat Hubs
     pcall(function()
         local remotes = ReplicatedStorage:FindFirstChild("Remotes")
         if remotes then
@@ -556,9 +501,6 @@ local function FindTargetBall()
     return closestBall, minD
 end
 
--- -------------------------------------------------------------
--- 6. Sistema de Comandos via Chat In-Game (.stay, .rush, .aura...)
--- -------------------------------------------------------------
 local function ExecuteChatCommand(sender, message)
     if not Config.chat_commands then return end
     local master, _ = GetCurrentMaster()
@@ -589,8 +531,6 @@ local function ExecuteChatCommand(sender, message)
     local cmd = string.lower(args[1] or "")
     local arg1 = args[2] or ""
     local arg2 = args[3] or ""
-
-    print(string.format("[STAND CMD] Comando recebido de %s: %s", sender.Name, cleanMsg))
 
     if cmd == "stand" then
         if arg1 == "off" or arg1 == "false" then
@@ -680,7 +620,6 @@ local function ExecuteChatCommand(sender, message)
     end
 end
 
--- Listener do Chat do Roblox
 local function HookChat(player)
     player.Chatted:Connect(function(msg)
         ExecuteChatCommand(player, msg)
@@ -707,9 +646,6 @@ pcall(function()
     end
 end)
 
--- -------------------------------------------------------------
--- 7. Sistema de Mímica (Copiar Ações do Mestre)
--- -------------------------------------------------------------
 local function CheckMasterMimic(master)
     if not Config.mimic_master or not master or not master.Character then return end
     local mHum = master.Character:FindFirstChild("Humanoid")
@@ -717,274 +653,4 @@ local function CheckMasterMimic(master)
 
     if not mHum or not myHum then return end
 
-    if mHum:GetState() == Enum.HumanoidStateType.Jumping and myHum:GetState() ~= Enum.HumanoidStateType.Jumping then
-        myHum:ChangeState(Enum.HumanoidStateType.Jumping)
-    end
-end
-
--- -------------------------------------------------------------
--- 8. UI Informativa Discreta (Montagem Segura com gethui/CoreGui)
--- -------------------------------------------------------------
-local function CreateStatusUI()
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "N1_Stand_Status"
-    sg.ResetOnSpawn = false
-    sg.DisplayOrder = 10001
-    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 310, 0, 52)
-    frame.Position = UDim2.new(0.5, -155, 0, 18)
-    frame.BackgroundColor3 = Color3.fromRGB(12, 11, 15)
-    frame.BorderSizePixel = 0
-    frame.Parent = sg
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(65, 38, 95)
-    stroke.Thickness = 1.2
-    stroke.Parent = frame
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = frame
-
-    local title = Instance.new("TextLabel")
-    title.Name = "MainTitle"
-    title.Size = UDim2.new(1, -16, 0, 22)
-    title.Position = UDim2.new(0, 10, 0, 4)
-    title.BackgroundTransparency = 1
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 12
-    title.TextColor3 = Color3.fromRGB(243, 239, 243)
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Text = string.format("✦ N1 STAND [%s]  |  CONECTANDO...", executorName)
-    title.Parent = frame
-
-    local sub = Instance.new("TextLabel")
-    sub.Name = "SubInfo"
-    sub.Size = UDim2.new(1, -16, 0, 20)
-    sub.Position = UDim2.new(0, 10, 0, 26)
-    sub.BackgroundTransparency = 1
-    sub.Font = Enum.Font.Gotham
-    sub.TextSize = 11
-    sub.TextColor3 = Color3.fromRGB(170, 161, 174)
-    sub.TextXAlignment = Enum.TextXAlignment.Left
-    sub.Text = "Modo: JoJo Float | Mestre: Aguardando..."
-    sub.Parent = frame
-
-    -- Montagem protegida
-    MountGui(sg)
-
-    -- Animação de entrada suave estilo Y Hub
-    frame.Position = UDim2.new(0.5, -155, 0, -60)
-    Animate(frame, { Position = UDim2.new(0.5, -155, 0, 18) }, 0.45)
-
-    return frame
-end
-
-local statusFrame = nil
-pcall(function() statusFrame = CreateStatusUI() end)
-
--- Loop de Polling HTTP / File Bridge (20 vezes por segundo)
-task.spawn(function()
-    while true do
-        LoadBridge()
-        task.wait(0.05)
-    end
-end)
-
--- -------------------------------------------------------------
--- 9. Loop Principal de Levitação JoJo e Movimento CFrame
--- -------------------------------------------------------------
-RunService.RenderStepped:Connect(function(dt)
-    -- Atualizar HUD do Usuário
-    if statusFrame then
-        local title = statusFrame:FindFirstChild("MainTitle")
-        local sub = statusFrame:FindFirstChild("SubInfo")
-
-        if title then
-            title.Text = string.format("✦ N1 STAND [%s]  |  %s", executorName, string.upper(connection_mode))
-        end
-
-        local master, masterRole = GetCurrentMaster()
-        if sub then
-            if not Config.enabled then
-                sub.Text = "Stand Desativado (.stand on)"
-            elseif master then
-                sub.Text = string.format("%s: %s | Modo: %s | Dist: %.1fm", masterRole, master.DisplayName, Config.stand_mode, Config.follow_distance)
-            else
-                sub.Text = "Aguardando Mestre... (.owner <nick>)"
-            end
-        end
-    end
-
-    if not Config.enabled then return end
-
-    local myChar = LocalPlayer.Character
-    if not myChar then return end
-    local myHum = myChar:FindFirstChild("Humanoid")
-    local myRoot = myChar:FindFirstChild("HumanoidRootPart")
-    if not myHum or not myRoot or myHum.Health <= 0 then return end
-
-    -- Aplicar Visual Fantasma, Aura e Tags
-    ApplyStandVisuals()
-    SuppressWalkingAnimations()
-
-    -- Desativar quedas e tropeços físicos
-    myHum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-    myHum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-    myHum.AutoRotate = false
-
-    local master, _ = GetCurrentMaster()
-    if master then
-        CheckMasterMimic(master)
-    end
-
-    -- ---------------------------------------------------------
-    -- FLUXO 1: ATAQUE COM RUSH ATÉ O INIMIGO
-    -- ---------------------------------------------------------
-    local enemyRoot = nil
-    if Config.auto_attack then
-        local minDist = Config.target_range
-
-        if Config.target_player and Config.target_player ~= "" then
-            local explicit = FindPlayer(Config.target_player)
-            if explicit and explicit.Character and explicit.Character:FindFirstChild("HumanoidRootPart") then
-                local ehum = explicit.Character:FindFirstChild("Humanoid")
-                if ehum and ehum.Health > 0 then
-                    enemyRoot = explicit.Character.HumanoidRootPart
-                end
-            end
-        end
-
-        if not enemyRoot and Config.auto_target then
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and p ~= master and p.Character and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
-                    local eroot = p.Character:FindFirstChild("HumanoidRootPart")
-                    if eroot then
-                        local d = (eroot.Position - myRoot.Position).Magnitude
-                        if d < minDist then
-                            minDist = d
-                            enemyRoot = eroot
-                        end
-                    end
-                end
-            end
-        end
-
-        if enemyRoot then
-            local distToEnemy = (enemyRoot.Position - myRoot.Position).Magnitude
-
-            -- Stand Voa/Teleporta em modo Rush na frente do inimigo
-            if Config.rush_on_attack then
-                local attackPos = enemyRoot.Position + (enemyRoot.CFrame.LookVector * Config.attack_distance)
-                local attackCF = CFrame.lookAt(attackPos, enemyRoot.Position)
-                myRoot.CFrame = myRoot.CFrame:Lerp(attackCF, math.clamp(dt * 20, 0, 1))
-            end
-
-            -- Acerta os Golpes (M1 / Heavy)
-            if distToEnemy <= (Config.attack_distance + 2.0) then
-                TriggerAttack(enemyRoot)
-            end
-
-            -- Modo Orbit de Combate
-            if Config.attack_mode == "Orbit" and Config.throw_orbit_speed > 0 then
-                local angle = (tick() * (Config.throw_orbit_speed * 0.1)) % (2 * math.pi)
-                local orbitPos = enemyRoot.Position + Vector3.new(math.cos(angle) * Config.attack_distance, 1.2, math.sin(angle) * Config.attack_distance)
-                local orbitCF = CFrame.lookAt(orbitPos, enemyRoot.Position)
-                myRoot.CFrame = myRoot.CFrame:Lerp(orbitCF, math.clamp(dt * 18, 0, 1))
-            end
-
-            -- Zera velocidade física para levitar perfeitamente
-            myRoot.AssemblyLinearVelocity = Vector3.zero
-            myRoot.AssemblyAngularVelocity = Vector3.zero
-            return
-        end
-    end
-
-    -- ---------------------------------------------------------
-    -- FLUXO 2: AUTO PARRY (BLADE BALL OU COMBATE CORPO A CORPO)
-    -- ---------------------------------------------------------
-    if Config.auto_parry then
-        local ball, dist = FindTargetBall()
-        if ball and dist then
-            local ballVelocity = ball.AssemblyLinearVelocity or ball.Velocity or Vector3.new(0, 0, 0)
-            local toMe = (myRoot.Position - ball.Position).Unit
-            local speed = ballVelocity.Magnitude
-
-            local isComing = ballVelocity:Dot(toMe) > 0.1
-            if isComing and dist <= Config.ball_min_dist then
-                TriggerParry()
-            elseif isComing and speed > 0 then
-                local timeToHit = dist / speed
-                if timeToHit <= 0.35 then
-                    TriggerParry()
-                end
-            end
-        end
-    end
-
-    -- ---------------------------------------------------------
-    -- FLUXO 3: POSICIONAMENTO E LEVITAÇÃO JOJO STAND
-    -- ---------------------------------------------------------
-    if Config.stand_mode == "Stay" and stay_cframe then
-        myRoot.CFrame = myRoot.CFrame:Lerp(stay_cframe, math.clamp(dt * 12, 0, 1))
-        myRoot.AssemblyLinearVelocity = Vector3.zero
-        myRoot.AssemblyAngularVelocity = Vector3.zero
-        return
-    end
-
-    if master and master.Character and master.Character:FindFirstChild("HumanoidRootPart") then
-        local masterRoot = master.Character.HumanoidRootPart
-
-        -- Cálculo do Efeito Flutuante / Levitação (Sine Wave Bobbing)
-        local bobbing = math.sin(tick() * Config.stand_bob_speed) * Config.stand_bob_height
-        local targetCFrame = masterRoot.CFrame
-
-        if Config.stand_mode == "JoJo" then
-            -- Flutuando ao lado do ombro (estilo Stand autêntico JoJo)
-            local offset = Vector3.new(Config.stand_offset_x, Config.stand_offset_y + bobbing, Config.stand_offset_z)
-            targetCFrame = masterRoot.CFrame * CFrame.new(offset)
-        elseif Config.stand_mode == "Back" then
-            local offset = Vector3.new(0, Config.stand_offset_y + bobbing, Config.follow_distance)
-            targetCFrame = masterRoot.CFrame * CFrame.new(offset)
-        elseif Config.stand_mode == "Front" then
-            local offset = Vector3.new(0, Config.stand_offset_y + bobbing, -Config.follow_distance)
-            targetCFrame = masterRoot.CFrame * CFrame.new(offset)
-        elseif Config.stand_mode == "Orbit" then
-            local angle = (tick() * 3.0) % (2 * math.pi)
-            local orbitOffset = Vector3.new(math.cos(angle) * Config.follow_distance, Config.stand_offset_y + bobbing, math.sin(angle) * Config.follow_distance)
-            targetCFrame = CFrame.new(masterRoot.Position + orbitOffset, masterRoot.Position)
-        end
-
-        local currentDist = (myRoot.Position - masterRoot.Position).Magnitude
-        if currentDist > 75.0 then
-            myRoot.CFrame = targetCFrame
-        else
-            myRoot.CFrame = myRoot.CFrame:Lerp(targetCFrame, math.clamp(dt * Config.follow_smoothness, 0, 1))
-        end
-
-        myRoot.AssemblyLinearVelocity = Vector3.zero
-        myRoot.AssemblyAngularVelocity = Vector3.zero
-    end
-end)
-
--- Reset e re-aplicação de visuais ao renascer
-LocalPlayer.CharacterAdded:Connect(function(newChar)
-    aura_instance = nil
-    overhead_instance = nil
-    task.wait(0.5)
-    ApplyStandVisuals()
-    if Config.auto_stance then
-        EnsureCombatStance()
-    end
-end)
-
-print(string.format([[
-=========================================================
-  ✦ N1 STAND CONTROLLER CARREGADO COM SUCESSO! ✦
-  Executor: %s | Estilo JoJo Flutuante + Gakuran Combat
-  Proteção: gethui / CoreGui montada
-  Prefixos de Chat: .stay | .rush | .follow | .aura purple
-=========================================================
-]], executorName))
+    if mHum
