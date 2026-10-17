@@ -653,4 +653,246 @@ local function CheckMasterMimic(master)
 
     if not mHum or not myHum then return end
 
-    if mHum
+    if mHum:GetState() == Enum.HumanoidStateType.Jumping and myHum:GetState() ~= Enum.HumanoidStateType.Jumping then
+        myHum:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end
+
+local function CreateStatusUI()
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "N1_Stand_Status"
+    sg.ResetOnSpawn = false
+    sg.DisplayOrder = 10001
+    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 310, 0, 52)
+    frame.Position = UDim2.new(0.5, -155, 0, 18)
+    frame.BackgroundColor3 = Color3.fromRGB(12, 11, 15)
+    frame.BorderSizePixel = 0
+    frame.Parent = sg
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(65, 38, 95)
+    stroke.Thickness = 1.2
+    stroke.Parent = frame
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
+
+    local title = Instance.new("TextLabel")
+    title.Name = "MainTitle"
+    title.Size = UDim2.new(1, -16, 0, 22)
+    title.Position = UDim2.new(0, 10, 0, 4)
+    title.BackgroundTransparency = 1
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 12
+    title.TextColor3 = Color3.fromRGB(243, 239, 243)
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Text = string.format("✦ N1 STAND [%s]  |  CONECTANDO...", executorName)
+    title.Parent = frame
+
+    local sub = Instance.new("TextLabel")
+    sub.Name = "SubInfo"
+    sub.Size = UDim2.new(1, -16, 0, 20)
+    sub.Position = UDim2.new(0, 10, 0, 26)
+    sub.BackgroundTransparency = 1
+    sub.Font = Enum.Font.Gotham
+    sub.TextSize = 11
+    sub.TextColor3 = Color3.fromRGB(170, 161, 174)
+    sub.TextXAlignment = Enum.TextXAlignment.Left
+    sub.Text = "Modo: JoJo Float | Mestre: Aguardando..."
+    sub.Parent = frame
+
+    MountGui(sg)
+
+    frame.Position = UDim2.new(0.5, -155, 0, -60)
+    Animate(frame, { Position = UDim2.new(0.5, -155, 0, 18) }, 0.45)
+
+    return frame
+end
+
+local statusFrame = nil
+pcall(function() statusFrame = CreateStatusUI() end)
+
+task.spawn(function()
+    while true do
+        LoadBridge()
+        task.wait(0.05)
+    end
+end)
+
+RunService.RenderStepped:Connect(function(dt)
+    if statusFrame then
+        local title = statusFrame:FindFirstChild("MainTitle")
+        local sub = statusFrame:FindFirstChild("SubInfo")
+
+        if title then
+            title.Text = string.format("✦ N1 STAND [%s]  |  %s", executorName, string.upper(connection_mode))
+        end
+
+        local master, masterRole = GetCurrentMaster()
+        if sub then
+            if not Config.enabled then
+                sub.Text = "Stand Desativado (.stand on)"
+            elseif master then
+                sub.Text = string.format("%s: %s | Modo: %s | Dist: %.1fm", masterRole, master.DisplayName, Config.stand_mode, Config.follow_distance)
+            else
+                sub.Text = "Aguardando Mestre... (.owner <nick>)"
+            end
+        end
+    end
+
+    if not Config.enabled then return end
+
+    local myChar = LocalPlayer.Character
+    if not myChar then return end
+    local myHum = myChar:FindFirstChild("Humanoid")
+    local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+    if not myHum or not myRoot or myHum.Health <= 0 then return end
+
+    ApplyStandVisuals()
+    SuppressWalkingAnimations()
+
+    myHum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+    myHum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+    myHum.AutoRotate = false
+
+    local master, _ = GetCurrentMaster()
+    if master then
+        CheckMasterMimic(master)
+    end
+
+    local enemyRoot = nil
+    if Config.auto_attack then
+        local minDist = Config.target_range
+
+        if Config.target_player and Config.target_player ~= "" then
+            local explicit = FindPlayer(Config.target_player)
+            if explicit and explicit.Character and explicit.Character:FindFirstChild("HumanoidRootPart") then
+                local ehum = explicit.Character:FindFirstChild("Humanoid")
+                if ehum and ehum.Health > 0 then
+                    enemyRoot = explicit.Character.HumanoidRootPart
+                end
+            end
+        end
+
+        if not enemyRoot and Config.auto_target then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p ~= master and p.Character and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                    local eroot = p.Character:FindFirstChild("HumanoidRootPart")
+                    if eroot then
+                        local d = (eroot.Position - myRoot.Position).Magnitude
+                        if d < minDist then
+                            minDist = d
+                            enemyRoot = eroot
+                        end
+                    end
+                end
+            end
+        end
+
+        if enemyRoot then
+            local distToEnemy = (enemyRoot.Position - myRoot.Position).Magnitude
+
+            if Config.rush_on_attack then
+                local attackPos = enemyRoot.Position + (enemyRoot.CFrame.LookVector * Config.attack_distance)
+                local attackCF = CFrame.lookAt(attackPos, enemyRoot.Position)
+                myRoot.CFrame = myRoot.CFrame:Lerp(attackCF, math.clamp(dt * 20, 0, 1))
+            end
+
+            if distToEnemy <= (Config.attack_distance + 2.0) then
+                TriggerAttack(enemyRoot)
+            end
+
+            if Config.attack_mode == "Orbit" and Config.throw_orbit_speed > 0 then
+                local angle = (tick() * (Config.throw_orbit_speed * 0.1)) % (2 * math.pi)
+                local orbitPos = enemyRoot.Position + Vector3.new(math.cos(angle) * Config.attack_distance, 1.2, math.sin(angle) * Config.attack_distance)
+                local orbitCF = CFrame.lookAt(orbitPos, enemyRoot.Position)
+                myRoot.CFrame = myRoot.CFrame:Lerp(orbitCF, math.clamp(dt * 18, 0, 1))
+            end
+
+            myRoot.AssemblyLinearVelocity = Vector3.zero
+            myRoot.AssemblyAngularVelocity = Vector3.zero
+            return
+        end
+    end
+
+    if Config.auto_parry then
+        local ball, dist = FindTargetBall()
+        if ball and dist then
+            local ballVelocity = ball.AssemblyLinearVelocity or ball.Velocity or Vector3.new(0, 0, 0)
+            local toMe = (myRoot.Position - ball.Position).Unit
+            local speed = ballVelocity.Magnitude
+
+            local isComing = ballVelocity:Dot(toMe) > 0.1
+            if isComing and dist <= Config.ball_min_dist then
+                TriggerParry()
+            elseif isComing and speed > 0 then
+                local timeToHit = dist / speed
+                if timeToHit <= 0.35 then
+                    TriggerParry()
+                end
+            end
+        end
+    end
+
+    if Config.stand_mode == "Stay" and stay_cframe then
+        myRoot.CFrame = myRoot.CFrame:Lerp(stay_cframe, math.clamp(dt * 12, 0, 1))
+        myRoot.AssemblyLinearVelocity = Vector3.zero
+        myRoot.AssemblyAngularVelocity = Vector3.zero
+        return
+    end
+
+    if master and master.Character and master.Character:FindFirstChild("HumanoidRootPart") then
+        local masterRoot = master.Character.HumanoidRootPart
+
+        local bobbing = math.sin(tick() * Config.stand_bob_speed) * Config.stand_bob_height
+        local targetCFrame = masterRoot.CFrame
+
+        if Config.stand_mode == "JoJo" then
+            local offset = Vector3.new(Config.stand_offset_x, Config.stand_offset_y + bobbing, Config.stand_offset_z)
+            targetCFrame = masterRoot.CFrame * CFrame.new(offset)
+        elseif Config.stand_mode == "Back" then
+            local offset = Vector3.new(0, Config.stand_offset_y + bobbing, Config.follow_distance)
+            targetCFrame = masterRoot.CFrame * CFrame.new(offset)
+        elseif Config.stand_mode == "Front" then
+            local offset = Vector3.new(0, Config.stand_offset_y + bobbing, -Config.follow_distance)
+            targetCFrame = masterRoot.CFrame * CFrame.new(offset)
+        elseif Config.stand_mode == "Orbit" then
+            local angle = (tick() * 3.0) % (2 * math.pi)
+            local orbitOffset = Vector3.new(math.cos(angle) * Config.follow_distance, Config.stand_offset_y + bobbing, math.sin(angle) * Config.follow_distance)
+            targetCFrame = CFrame.new(masterRoot.Position + orbitOffset, masterRoot.Position)
+        end
+
+        local currentDist = (myRoot.Position - masterRoot.Position).Magnitude
+        if currentDist > 75.0 then
+            myRoot.CFrame = targetCFrame
+        else
+            myRoot.CFrame = myRoot.CFrame:Lerp(targetCFrame, math.clamp(dt * Config.follow_smoothness, 0, 1))
+        end
+
+        myRoot.AssemblyLinearVelocity = Vector3.zero
+        myRoot.AssemblyAngularVelocity = Vector3.zero
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    aura_instance = nil
+    overhead_instance = nil
+    task.wait(0.5)
+    ApplyStandVisuals()
+    if Config.auto_stance then
+        EnsureCombatStance()
+    end
+end)
+
+print(string.format([[
+=========================================================
+  ✦ N1 STAND CONTROLLER CARREGADO COM SUCESSO! ✦
+  Executor: %s | Estilo JoJo Flutuante + Gakuran Combat
+  Proteção: gethui / CoreGui montada
+  Prefixos de Chat: .stay | .rush | .follow | .aura purple
+=========================================================
+]], executorName))
